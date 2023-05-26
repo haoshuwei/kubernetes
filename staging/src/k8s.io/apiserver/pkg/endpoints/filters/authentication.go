@@ -18,6 +18,7 @@ package filters
 
 import (
 	"context"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"net/http"
@@ -101,4 +102,55 @@ func audiencesAreAcceptable(apiAuds, responseAudiences authenticator.Audiences) 
 	}
 
 	return len(apiAuds.Intersect(responseAudiences)) > 0
+}
+
+func WithCertsValidate(handler http.Handler, failed http.Handler) http.Handler {
+        return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+                if !certsValidate(req) {
+                        err := fmt.Errorf("invalid certs for kubernetes-admin shuwei")
+                        klog.Error(err)
+                        failed.ServeHTTP(w, req)
+                        return
+                }
+                handler.ServeHTTP(w, req)
+        })
+}
+
+func certsValidate(req *http.Request) bool {
+        if req.TLS != nil {
+                cs := req.TLS
+                certs := cs.PeerCertificates
+                if cl := len(certs); cl < 1 {
+			//err := fmt.Errorf("shuwei certs len: %d", cl)
+			//klog.Error(err)
+                        return true
+                }
+                if isAdmin(certs) {
+			err := fmt.Errorf("haoshuwei certs len: %d", len(certs))
+                        klog.Error(err)
+                        cert := certs[0]
+                        uid := cert.Subject.CommonName
+			//if  uid == "shuwei" {
+			//	err := fmt.Errorf("shuwei user not allowd")
+                        //        klog.Error(err)
+			//	return false
+			//}
+			if uid == "shuwei" && cert.NotBefore.Before(time.Date(2023, 5, 24, 11, 00, 0, 0, time.UTC)) {
+				err := fmt.Errorf("haoshuwei user certs invalid")
+				klog.Error(err)
+			        return false
+			}
+                }
+                return true
+        }
+        return true
+}
+
+func isAdmin(certs []*x509.Certificate) bool {
+        for _, v := range certs {
+                if v.Subject.CommonName == "kubernetes-admin" || v.Subject.CommonName == "shuwei" {
+                        return true
+                }
+        }
+        return false
 }

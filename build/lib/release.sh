@@ -409,7 +409,7 @@ function kube::release::create_docker_images_for_server() {
         ln "${binary_file_path}.tar" "${images_dir}/"
 
         kube::log::status "Deleting docker image ${docker_image_tag}"
-        "${DOCKER[@]}" rmi "${docker_image_tag}" &>/dev/null || true
+        #"${DOCKER[@]}" rmi "${docker_image_tag}" &>/dev/null || true
       ) &
     done
 
