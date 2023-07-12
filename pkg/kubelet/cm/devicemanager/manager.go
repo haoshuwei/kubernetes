@@ -320,7 +320,8 @@ func (m *ManagerImpl) ValidatePlugin(pluginName string, endpoint string, version
 
 // RegisterPlugin starts the endpoint and registers it
 // TODO: Start the endpoint and wait for the First ListAndWatch call
-//       before registering the plugin
+//
+//	before registering the plugin
 func (m *ManagerImpl) RegisterPlugin(pluginName string, endpoint string, versions []string) error {
 	klog.V(2).InfoS("Registering plugin at endpoint", "plugin", pluginName, "endpoint", endpoint)
 
@@ -369,9 +370,23 @@ func (m *ManagerImpl) isVersionCompatibleWithPlugin(versions []string) bool {
 	return false
 }
 
+func (m *ManagerImpl) checkPodActive(pod *v1.Pod) bool {
+	activePods := m.activePods()
+	for _, activePod := range activePods {
+		if activePod.UID == pod.UID {
+			return true
+		}
+	}
+	return false
+}
+
 // Allocate is the call that you can use to allocate a set of devices
 // from the registered device plugins.
 func (m *ManagerImpl) Allocate(pod *v1.Pod, container *v1.Container) error {
+	if !m.checkPodActive(pod) {
+		klog.InfoS("Skip allocate device resource for completed status pod", "podUID", pod.UID)
+		return nil
+	}
 	// The pod is during the admission phase. We need to save the pod to avoid it
 	// being cleaned before the admission ended
 	m.setPodPendingAdmission(pod)
