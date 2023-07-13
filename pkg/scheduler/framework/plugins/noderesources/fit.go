@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
+	"k8s.io/klog/v2"
 )
 
 var _ framework.PreFilterPlugin = &Fit{}
@@ -250,6 +251,7 @@ type InsufficientResource struct {
 
 // Fits checks if node have enough resources to host the pod.
 func Fits(pod *v1.Pod, nodeInfo *framework.NodeInfo, enablePodOverhead bool) []InsufficientResource {
+	klog.V(2).Infof("=====fitsRequest", "podName", pod.Name, "Allocatable", nodeInfo.Allocatable.ScalarResources, "Requested", nodeInfo.Requested.ScalarResources)
 	return fitsRequest(computePodResourceRequest(pod, enablePodOverhead), nodeInfo, nil, nil)
 }
 
@@ -314,6 +316,7 @@ func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignor
 				continue
 			}
 		}
+		klog.V(2).Infof("=====fitsRequest", "rName", rName, "rQuant", rQuant, "Allocatable", nodeInfo.Allocatable.ScalarResources[rName], "Requested", nodeInfo.Requested.ScalarResources[rName])
 		if rQuant > (nodeInfo.Allocatable.ScalarResources[rName] - nodeInfo.Requested.ScalarResources[rName]) {
 			insufficientResources = append(insufficientResources, InsufficientResource{
 				rName,

@@ -383,13 +383,15 @@ func (m *ManagerImpl) checkPodActive(pod *v1.Pod) bool {
 // Allocate is the call that you can use to allocate a set of devices
 // from the registered device plugins.
 func (m *ManagerImpl) Allocate(pod *v1.Pod, container *v1.Container) error {
-	if !m.checkPodActive(pod) {
-		klog.InfoS("Skip allocate device resource for completed status pod", "podUID", pod.UID)
-		return nil
-	}
 	// The pod is during the admission phase. We need to save the pod to avoid it
 	// being cleaned before the admission ended
 	m.setPodPendingAdmission(pod)
+
+
+    // Skip allocate device resource for completed status pod
+	if !m.checkPodActive(pod) {
+		return nil
+	}
 
 	if _, ok := m.devicesToReuse[string(pod.UID)]; !ok {
 		m.devicesToReuse[string(pod.UID)] = make(map[string]sets.String)
@@ -589,6 +591,7 @@ func (m *ManagerImpl) GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
 			klog.ErrorS(err, "Error on writing checkpoint")
 		}
 	}
+	klog.V(2).Infof("====GetCapacity", "capacity", capacity, "allocatable", allocatable, "healthyDevices", m.healthyDevices, "unhealthyDevices", m.unhealthyDevices)
 	return capacity, allocatable, deletedResources.UnsortedList()
 }
 
@@ -643,10 +646,13 @@ func (m *ManagerImpl) readCheckpoint() error {
 	podDevices, registeredDevs := cp.GetDataInLatestFormat()
 	m.podDevices.fromCheckpointData(podDevices)
 	m.allocatedDevices = m.podDevices.devices()
-	for resource := range registeredDevs {
+	for resource, devices := range registeredDevs {
 		// During start up, creates empty healthyDevices list so that the resource capacity
 		// will stay zero till the corresponding device plugin re-registers.
 		m.healthyDevices[resource] = sets.NewString()
+		for _, device := range devices {
+			m.healthyDevices[resource].Insert(device)
+		}
 		m.unhealthyDevices[resource] = sets.NewString()
 		m.endpoints[resource] = endpointInfo{e: newStoppedEndpointImpl(resource), opts: nil}
 	}
@@ -756,6 +762,7 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 	devicesInUse := m.allocatedDevices[resource]
 	// Gets Available devices.
 	available := m.healthyDevices[resource].Difference(devicesInUse)
+	klog.V(2).InfoS("tttt devicesToAllocate", "devicesInUse", devicesInUse, "m.healthyDevices[resource]", m.healthyDevices[resource], "podUID", string(podUID), "containerName", contName)
 	if available.Len() < needed {
 		return nil, fmt.Errorf("requested number of devices unavailable for %s. Requested: %d, Available: %d", resource, needed, available.Len())
 	}

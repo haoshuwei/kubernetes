@@ -19,6 +19,7 @@ package lifecycle
 import (
 	"fmt"
 	"runtime"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apiserver/pkg/util/feature"
@@ -75,6 +76,10 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	pods := attrs.OtherPods
 	nodeInfo := schedulerframework.NewNodeInfo(pods...)
 	nodeInfo.SetNode(node)
+	if strings.Contains(admitPod.Name, "job-") || strings.Contains(admitPod.Name, "nginx-") {
+		klog.V(2).Infof("sssss admit pod nodeinfo", "pod", admitPod.Name, "nodeinfo", nodeInfo.Allocatable.ScalarResources)
+	}
+	
 	// ensure the node has enough plugin resources for that required in pods
 	if err = w.pluginResourceUpdateFunc(nodeInfo, attrs); err != nil {
 		message := fmt.Sprintf("Update plugin resources failed due to %v, which is unexpected.", err)
@@ -84,6 +89,10 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 			Reason:  "UnexpectedAdmissionError",
 			Message: message,
 		}
+	}
+
+	if strings.Contains(admitPod.Name, "job-") || strings.Contains(admitPod.Name, "nginx-") {
+		klog.V(2).Infof("ssss admit pod nodeinfo", "pod", admitPod.Name, "nodeinfo", nodeInfo.Allocatable.ScalarResources)
 	}
 
 	// Remove the requests of the extended resources that are missing in the
